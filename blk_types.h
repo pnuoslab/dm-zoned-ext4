@@ -284,6 +284,8 @@ enum {
 				 * of this bio. */
 	BIO_CGROUP_ACCT,	/* has been accounted to a cgroup */
 	BIO_TRACKED,		/* set if bio goes through the rq_qos path */
+	BIO_EXT4_FILE,		/* ext4 file */
+	BIO_EXT4_JRNL,		/* ext4 journal */
 	BIO_FLAG_LAST
 };
 

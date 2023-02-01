@@ -171,6 +171,8 @@ struct dmz_metadata {
 	unsigned int		nr_reserved_seq;
 	unsigned int		nr_chunks;
 
+	unsigned int		journal_zone;
+
 	/* Zone information array */
 	struct xarray		zones;
 
@@ -1981,6 +1983,8 @@ static struct dm_zone *dmz_get_rnd_zone_for_reclaim(struct dmz_metadata *zmd,
 			if (!maxw_z || maxw_z->weight < dzone->weight)
 				maxw_z = dzone;
 		} else {
+			if (dmz_is_journal(zone))
+				continue;
 			dzone = zone;
 			if (dmz_lock_zone_reclaim(dzone))
 				return dzone;
@@ -2131,6 +2135,57 @@ again:
 out:
 	dmz_unlock_map(zmd);
 
+	return dzone;
+}
+
+struct dm_zone *dmz_get_journal_dzone(struct dmz_metadata *zmd, unsigned int chunk, int op)
+{
+	unsigned int dzone_id;
+	struct dm_zone *dzone = NULL;
+	int ret = 0;
+	int alloc_flags = zmd->nr_cache ? DMZ_ALLOC_CACHE : DMZ_ALLOC_RND;
+
+	dmz_lock_map(zmd);
+again:
+	/* Get the journal zone */
+	dzone_id = le32_to_cpu(zmd->journal_zone);
+	if (dzone_id == DMZ_MAP_UNMAPPED) {
+		/*
+		 * Read or discard in unmapped chunks are fine. But for
+		 * writes, we need a mapping, so get one.
+		 */
+		if (op != REQ_OP_WRITE)
+			goto out;
+
+		/* Allocate a random zone */
+		dzone = dmz_alloc_zone(zmd, 0, alloc_flags);
+		if (!dzone) {
+			if (dmz_dev_is_dying(zmd)) {
+				dzone = ERR_PTR(-EIO);
+				goto out;
+			}
+			dmz_wait_for_free_zones(zmd);
+			goto again;
+		}
+
+        zmd->journal_zone = dzone->id;
+		set_bit(DMZ_JOURNAL, &dzone->flags);
+	    dzone->chunk = chunk;
+        if (dmz_is_cache(dzone))
+            list_add_tail(&dzone->link, &zmd->map_cache_list);
+        else
+            list_add_tail(&dzone->link, &dzone->dev->map_rnd_list);
+
+	} else {
+		/* The chunk is already mapped: get the mapping zone */
+		dzone = dmz_get(zmd, zmd->journal_zone);
+		if (!dzone) {
+			dzone = ERR_PTR(-EIO);
+			goto out;
+		}
+	}
+out:
+	dmz_unlock_map(zmd);
 	return dzone;
 }
 
@@ -2944,6 +2999,9 @@ int dmz_ctr_metadata(struct dmz_dev *dev, int num_dev,
 	ret = dmz_load_mapping(zmd);
 	if (ret)
 		goto err;
+
+	/* Set journal zone mapping information */
+	zmd->journal_zone = DMZ_MAP_UNMAPPED;
 
 	/*
 	 * Cache size boundaries: allow at least 2 super blocks, the chunk map

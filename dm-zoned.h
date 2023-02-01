@@ -134,6 +134,7 @@ enum {
 	DMZ_CACHE,
 	DMZ_RND,
 	DMZ_SEQ,
+	DMZ_JOURNAL,
 
 	/* Zone critical condition */
 	DMZ_OFFLINE,
@@ -157,6 +158,7 @@ enum {
 #define dmz_is_cache(z)		test_bit(DMZ_CACHE, &(z)->flags)
 #define dmz_is_rnd(z)		test_bit(DMZ_RND, &(z)->flags)
 #define dmz_is_seq(z)		test_bit(DMZ_SEQ, &(z)->flags)
+#define dmz_is_journal(z)   test_bit(DMZ_JOURNAL, &(z)->flags)
 #define dmz_is_empty(z)		((z)->wp_block == 0)
 #define dmz_is_offline(z)	test_bit(DMZ_OFFLINE, &(z)->flags)
 #define dmz_is_readonly(z)	test_bit(DMZ_READ_ONLY, &(z)->flags)
@@ -249,6 +251,8 @@ struct dm_zone *dmz_get_zone_for_reclaim(struct dmz_metadata *zmd,
 					 unsigned int dev_idx, bool idle);
 
 struct dm_zone *dmz_get_chunk_mapping(struct dmz_metadata *zmd,
+				      unsigned int chunk, int op);
+struct dm_zone *dmz_get_journal_dzone(struct dmz_metadata *zmd,
 				      unsigned int chunk, int op);
 void dmz_put_chunk_mapping(struct dmz_metadata *zmd, struct dm_zone *zone);
 struct dm_zone *dmz_get_chunk_buffer(struct dmz_metadata *zmd,

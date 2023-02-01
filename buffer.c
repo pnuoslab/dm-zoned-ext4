@@ -3042,6 +3042,8 @@ static int submit_bh_wbc(int op, int op_flags, struct buffer_head *bh,
 	if (buffer_prio(bh))
 		op_flags |= REQ_PRIO;
 	bio_set_op_attrs(bio, op, op_flags);
+	if (bh->is_ext4_jrnl == 1)
+		bio_set_flag(bio, BIO_EXT4_JRNL);
 
 	/* Take care of bh's that straddle the end of the device */
 	guard_bio_eod(bio);

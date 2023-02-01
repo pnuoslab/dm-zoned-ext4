@@ -120,7 +120,7 @@ static int dmz_submit_bio(struct dmz_target *dmz, struct dm_zone *zone,
 	struct dmz_bioctx *bioctx =
 		dm_per_bio_data(bio, sizeof(struct dmz_bioctx));
 	struct dmz_dev *dev = zone->dev;
-	struct bio *clone;
+	struct bio *clone, *journal;
 
 	if (dev->flags & DMZ_BDEV_DYING)
 		return -EIO;
@@ -407,9 +407,14 @@ static void dmz_handle_bio(struct dmz_target *dmz, struct dm_chunk_work *cw,
 	/*
 	 * Get the data zone mapping the chunk. There may be no
 	 * mapping for read and discard. If a mapping is obtained,
-	 + the zone returned will be set to active state.
+	 * the zone returned will be set to active state.
+	 * If the data zone is Journal zone, Get the Journal zone.
 	 */
-	zone = dmz_get_chunk_mapping(zmd, dmz_bio_chunk(zmd, bio),
+	if (bio_flagged(bio, BIO_EXT4_JRNL))
+		zone = dmz_get_journal_dzone(zmd, dmz_bio_chunk(zmd, bio),
+				     bio_op(bio));
+	else
+		zone = dmz_get_chunk_mapping(zmd, dmz_bio_chunk(zmd, bio),
 				     bio_op(bio));
 	if (IS_ERR(zone)) {
 		ret = PTR_ERR(zone);

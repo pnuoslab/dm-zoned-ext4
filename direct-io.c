@@ -32,6 +32,7 @@ struct iomap_dio {
 	unsigned		flags;
 	int			error;
 	bool			wait_for_completion;
+	int			is_ext4_file;
 
 	union {
 		/* used during submission and for synchronous completion: */
@@ -305,6 +306,9 @@ iomap_dio_bio_actor(struct inode *inode, loff_t pos, loff_t length,
 				bio_set_pages_dirty(bio);
 		}
 
+		if (dio->is_ext4_file == 1)
+			bio_set_flag(bio, BIO_EXT4_FILE);
+
 		dio->size += n;
 		copied += n;
 
@@ -463,6 +467,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	} else {
 		flags |= IOMAP_WRITE;
 		dio->flags |= IOMAP_DIO_WRITE;
+		dio->is_ext4_file = 1;
 
 		/* for data sync or sync, we need sync completion processing */
 		if (iocb->ki_flags & IOCB_DSYNC)

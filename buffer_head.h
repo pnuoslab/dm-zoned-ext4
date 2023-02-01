@@ -76,6 +76,7 @@ struct buffer_head {
 	spinlock_t b_uptodate_lock;	/* Used by the first bh in a page, to
 					 * serialise IO completion of other
 					 * buffers in the page */
+	int is_ext4_jrnl;		/* Used to indicating journal I/O requests */
 };
 
 /*
